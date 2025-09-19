@@ -4,7 +4,7 @@ import Observation
 /// Raw ingredient as entered by user - needs parsing
 @Observable
 final class RawIngredient: Identifiable {
-    let id = UUID()
+    var id: UUID = UUID()
 
     /// Original text as entered (e.g., "2 cups bread flour" or "350ml warm water")
     var text: String = ""
@@ -27,7 +27,8 @@ final class RawIngredient: Identifiable {
 
     init() {}
 
-    init(text: String) {
+    init(text: String, id: UUID = UUID()) {
+        self.id = id
         self.text = text
     }
 }
@@ -71,7 +72,9 @@ extension RawIngredient: Codable {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Note: id is auto-generated as UUID()
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
         text = try container.decode(String.self, forKey: .text)
 
         parsedAmount = try container.decodeIfPresent(Double.self, forKey: .parsedAmount)

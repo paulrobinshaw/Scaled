@@ -7,11 +7,11 @@
 **Platform:** iOS (SwiftUI)
 **Target Release:** V1.0 Q3 2025
 
-**One-Line Vision:** Turn messy recipes into bulletproof baker's formulas for rock-solid scaling.
+**One-Line Vision:** Give every baker a fast, reliable co-pilot that turns any rough recipe into a ready-to-bake plan in seconds.
 
 **The Problem:** Bakers waste hours figuring out what to mix. Recipes can be on scraps of paper, spreadsheets, whiteboards or even someone's head.
 
-**The Solution:** Use a defined formula that has either been previously photographed, edited and stored or is available to be photographed on the fly.
+**The Solution:** Combine quick capture tools, rock-solid baker's math, and clear production checklists so bakers can plan, double-check, and run batches with confidence on a single device.
 
 ---
 
@@ -27,6 +27,17 @@
 
 ### Success Metric
 **Core Goal:** Baker goes from "I got an order" to "Here's exactly what I need to weigh" in under 60 seconds with 100% confidence in the math.
+
+---
+
+## Where We're Heading (2026+)
+
+- **Smarter batch advice:** Learn from past bakes (with permission) to suggest hydration, timing, and mix adjustments before a mistake happens.
+- **Shift planning:** Help head bakers line up ovens, teams, and handoffs across multiple locations.
+- **Shared playbook:** Build a growing library of baking know-how that spots unusual numbers and recommends fixes.
+- **Connected tools:** Talk to pro scales, proofers, and inventory systems so the plan on screen matches what happens in the kitchen.
+
+These goals keep the "Simple, Lovable, Complete" foundation but point the product at the bigger operations problems bakeries want solved next.
 
 ---
 
@@ -65,6 +76,7 @@
 - **Photo Capture:** Secondary "magic" feature - AI assists but doesn't replace manual
 - **Quick Scaling:** "200 loaves × 900g" interface for instant scaling
 - **Recipe Saving/Library:** Store validated formulas for reuse
+- **Trust Panel:** Show the math behind each ingredient, flag odd numbers, and let bakers compare "what if" tweaks before they mix
 
 #### 2. Rock-Solid Scaling Engine
 - **Preferment Calculator First:** Build robust preferment math as foundation
@@ -88,6 +100,8 @@
 - **Timer Integration:** Basic fermentation timers
 - **Temperature Adjustments:** Adjust timing based on dough/room temperature
 - **Batch History:** Track what was made when
+- **What-If Planning:** Try different yields, hydrations, or preferment ratios and see updated weights instantly
+- **Environment Tips:** Suggest salt, water, or timing adjustments based on flour notes, room temperature, or starter strength
 
 ### Nice to Have (P2) - Future Versions
 - Production scheduling
@@ -96,6 +110,8 @@
 - Inventory management
 - Multiple preferment support in single recipe
 - Sourdough starter feeding calculator
+- Demand forecasts and production scheduling
+- Integrations with connected scales, proofers, and mixers
 
 ---
 
@@ -106,6 +122,7 @@
 - **Minimum iOS Version:** iOS 16+
 - **Storage:** Local storage initially (Core Data)
 - **AI Integration:** OpenAI Vision API for photo recipe extraction (optional feature)
+- **Future-friendly code:** Structure modules so they can ship on macOS or visionOS later without major rewrites
 
 ### Performance Requirements
 - Photo processing: < 10 seconds (when online)
@@ -155,6 +172,12 @@ enum PrefermentType {
 }
 ```
 
+### Learning From Real Batches
+
+- **Optional feedback loop:** With baker opt-in, log how batches turned out (hydration, timing, fixes) in a privacy-safe way.
+- **Helpful suggestions:** Use that history plus flour details to recommend better hydrations, salt levels, or timelines for similar doughs.
+- **Always explain:** Every suggestion must show why we recommended it and how confident we are, so bakers can trust or dismiss it quickly.
+
 ### Critical Edge Cases & Solutions
 
 1. **Multiple Flours:** Sum all flours for 100% base, show individual percentages
@@ -196,45 +219,40 @@ enum PrefermentType {
 - **Photo Accuracy:** 70%+ accuracy (it's a bonus feature, not core)
 - **Retention:** 60%+ of users return within 7 days
 - **App Store:** 4.5+ star rating (quality over quantity)
+- **Plan speed:** Median time from capture to final formula under 45 seconds
+- **Advice value:** At least half of the bakers who see a warning or suggestion say it helped them fix an issue
 
 ### Business Metrics
 - **Break-even:** 500 users at $29.99 = $15,000 (covers development)
 - **Success:** 2,000 users in year one
 - **API Costs:** Keep under $1 per user lifetime (limit photo usage)
+- **Expansion:** Sign 10 paying micro-bakeries to pilot the operations features in year one
+- **Learning Pool:** Collect anonymized feedback on 5,000 batches to fuel better guidance
 
 ---
 
 ## Development Strategy
 
-### Week 1-2: Foundation
-- Bulletproof scaling engine with comprehensive tests
-- Preferment calculator as core module
-- Basic data models and persistence
+### Phase 0: Vision Warm-Up (Week 0-1)
+- Sit down with a handful of bakers, map the "autopilot" moments they want, and agree on the privacy rules for collecting batch feedback.
 
-### Week 3-4: Templates & Input
-- 5 core bread templates fully tested
-- Manual recipe input UI
-- Scale by any ingredient interface
+### Phase 1: Core Engine (Weeks 1-3)
+- Lock in the scaling math, preferment handling, and hydration checks with automated tests.
+- Set up local storage that can later sync across devices.
 
-### Week 5-6: Polish & Output
-- PDF export functionality
-- Production formatting
-- Error checking and edge cases
+### Phase 2: Capture & Templates (Weeks 3-6)
+- Ship the manual entry flow with a fast keypad and clear validation.
+- Launch the starter set of templates and an AI/photo assist with a simple review screen.
 
-### Week 7-8: Beta & Iterate
-- Beta test with 5-10 real bakers
-- Daily iteration based on feedback
-- Polish the 60-second experience
+### Phase 3: Production Flow (Weeks 6-9)
+- Add the trust panel, production-mode checklist, PDF/print exports, and deeper error messaging.
 
-### Week 9-10: Photo Feature (If Time)
-- Add as "experimental feature"
-- Clear expectations about accuracy
-- Manual correction UI
+### Phase 4: Smart Guidance Pilot (Weeks 9-12)
+- Turn on the optional batch feedback loop, deliver first-round hydration/timing suggestions, and test them with 10 pilot bakers.
 
-### Week 11-12: Launch Prep
-- App Store materials
-- Documentation
-- Support system
+### Phase 5: Launch & Aftercare (Weeks 12-14)
+- Prepare App Store assets, support scripts, and training guides.
+- Use the pilot feedback and telemetry to plan the next releases.
 
 ---
 
@@ -252,6 +270,9 @@ enum PrefermentType {
 - **API Costs**
   - *Mitigation:* Limit free photo extractions
   - *Mitigation:* Cache common recipe formats
+- **Telemetry & Privacy**
+  - *Mitigation:* Make batch sharing strictly opt-in with plain-language explanations and on-device scrubbing
+  - *Mitigation:* Agree on data-retention rules with pilot bakers before launch
 
 ### Market Risks
 - **Spreadsheet Competition**
@@ -297,6 +318,8 @@ enum PrefermentType {
 3. **Photo Feature:** Launch with or wait for V1.1?
 4. **Beta Duration:** 2 weeks or 4 weeks of testing?
 5. **Launch Market:** Global or US-only initially?
+6. **Batch Sharing:** What makes bakers comfortable opting in to share results?
+7. **Hardware Partners:** Which scale or proofer makers should we talk to first?
 
 ---
 

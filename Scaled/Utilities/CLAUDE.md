@@ -26,29 +26,27 @@ Utilities provide:
 Organize extensions by the type they extend:
 
 ```swift
-// Date+Extensions.swift
-extension Date {
-    var isToday: Bool {
-        Calendar.current.isDateInToday(self)
+// Double+BakersMath.swift
+extension Double {
+    /// Formats baker's percentages with a trailing percent symbol.
+    var bakersPercentageString: String {
+        String(format: "%.1f%%", self)
     }
 
-    func formatted(as format: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = format
-        return formatter.string(from: self)
+    /// Rounds gram weights according to a Formula's rounding precision.
+    func rounded(to precision: RoundingPrecision) -> Double {
+        let factor = pow(10, Double(precision.decimalPlaces))
+        return (self * factor).rounded() / factor
     }
 }
 
-// String+Validation.swift
-extension String {
-    var isValidEmail: Bool {
-        let emailRegex = #"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$"#
-        let predicate = NSPredicate(format: "SELF MATCHES[c] %@", emailRegex)
-        return predicate.evaluate(with: self)
-    }
-
-    var trimmed: String {
-        trimmingCharacters(in: .whitespacesAndNewlines)
+// Array+FlourType.swift
+extension Array where Element == FlourItem {
+    /// Total flour weight for the provided flour types.
+    func totalWeight(of types: Set<FlourType>) -> Double {
+        reduce(0) { total, item in
+            types.contains(item.type) ? total + item.weight : total
+        }
     }
 }
 ```
@@ -58,37 +56,42 @@ extension String {
 Create reusable styling and behavior modifiers:
 
 ```swift
-// ViewModifiers.swift
-struct CardStyle: ViewModifier {
+// WarningBannerModifier.swift
+struct ValidationBannerModifier: ViewModifier {
+    let warnings: [ValidationWarning]
+
     func body(content: Content) -> some View {
-        content
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(radius: 4)
+        VStack(spacing: 12) {
+            content
+
+            if !warnings.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(warnings) { warning in
+                        Label(warning.message, systemImage: warning.level == .error ? "exclamationmark.octagon" : "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(color(for: warning.level))
+                    }
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    private func color(for level: WarningLevel) -> Color {
+        switch level {
+        case .error: return .red
+        case .warning: return .orange
+        case .info: return .blue
+        }
     }
 }
 
 extension View {
-    func cardStyle() -> some View {
-        modifier(CardStyle())
-    }
-}
-
-// LoadingOverlay.swift
-struct LoadingOverlay: ViewModifier {
-    let isLoading: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .overlay {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.3))
-                }
-            }
-            .allowsHitTesting(!isLoading)
+    func validationBanner(_ warnings: [ValidationWarning]) -> some View {
+        modifier(ValidationBannerModifier(warnings: warnings))
     }
 }
 ```
@@ -96,23 +99,21 @@ struct LoadingOverlay: ViewModifier {
 ## Constants and Configuration
 
 ```swift
-// Constants.swift
-enum Constants {
-    enum API {
-        static let baseURL = "https://api.example.com/v1"
-        static let timeout: TimeInterval = 30
-    }
+// BakersMathConstants.swift
+enum BakersMathConstants {
+    static let defaultHydrationWarningRange: ClosedRange<Double> = 85...110
+    static let typicalSaltPercentage: ClosedRange<Double> = 1.6...2.4
+    static let prefermentedFlourUpperBound: Double = 40
+}
 
-    enum UI {
-        static let cornerRadius: CGFloat = 12
-        static let spacing: CGFloat = 16
-        static let animationDuration: Double = 0.3
-    }
-
-    enum Storage {
-        static let userKey = "com.app.currentUser"
-        static let settingsKey = "com.app.settings"
-    }
+// FormattingConstants.swift
+enum FormattingConstants {
+    static let gramsFormatter: MeasurementFormatter = {
+        let formatter = MeasurementFormatter()
+        formatter.unitOptions = .providedUnit
+        formatter.numberFormatter.maximumFractionDigits = 1
+        return formatter
+    }()
 }
 ```
 
@@ -121,20 +122,20 @@ enum Constants {
 Keep helper functions pure and testable:
 
 ```swift
-// Helpers.swift
-enum Helpers {
-    static func delay(_ seconds: Double) async {
-        try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+// BakersMath.swift
+enum BakersMath {
+    static func hydration(water: Double, flour: Double) -> Double {
+        guard flour > 0 else { return 0 }
+        return (water / flour) * 100
     }
 
-    static func randomID() -> String {
-        UUID().uuidString
+    static func prefermentedFlourPercentage(prefermentedFlour: Double, totalFlour: Double) -> Double {
+        guard totalFlour > 0 else { return 0 }
+        return (prefermentedFlour / totalFlour) * 100
     }
 
-    static func formatCurrency(_ amount: Decimal) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        return formatter.string(from: amount as NSNumber) ?? "$0.00"
+    static func scaledWeight(original: Double, factor: Double, precision: RoundingPrecision) -> Double {
+        (original * factor).rounded(to: precision)
     }
 }
 ```
@@ -142,35 +143,35 @@ enum Helpers {
 ## Guidelines
 
 ### DO:
-- Keep utilities pure (no side effects when possible)
-- Group related utilities together
-- Write unit tests for complex utilities
-- Use meaningful names
-- Add documentation comments
-- Make utilities generic when appropriate
+- Keep utilities pure (no side effects where possible)
+- Group helpers by concept (baker's math, formatting, validation)
+- Cover edge cases with tests (zero flour, extreme hydration, rounding)
+- Provide doc comments describing bakery-specific rules
+- Prefer deterministic number formatting helpers over ad-hoc `String(format:)`
 
 ### DON'T:
-- Create "Utils" grab bags with unrelated functions
-- Duplicate Swift standard library functionality
-- Make utilities dependent on app state
-- Over-engineer simple problems
+- Create "Utils" grab bags with unrelated helpers
+- Duplicate functionality that belongs in services or models
+- Make utilities depend on global mutable state or SwiftUI views
+- Bury business rules in extensions without documentation
 
 ## Organization
 
 ```
 Utilities/
 ├── Extensions/
-│   ├── View+Extensions.swift
-│   ├── Date+Extensions.swift
-│   ├── String+Extensions.swift
-│   └── Collection+Extensions.swift
+│   ├── Double+BakersMath.swift
+│   ├── Array+FlourType.swift
+│   └── Date+BatchPlanning.swift
 ├── ViewModifiers/
-│   ├── Styling.swift
-│   └── Animations.swift
+│   ├── ValidationBannerModifier.swift
+│   └── HydrationBadgeModifier.swift
 ├── Helpers/
-│   ├── Validators.swift
-│   └── Formatters.swift
-└── Constants.swift
+│   ├── BakersMath.swift
+│   ├── IngredientParsingHelpers.swift
+│   └── Rounding.swift
+└── Constants/
+    └── BakersMathConstants.swift
 ```
 
 ## Testing
@@ -178,23 +179,24 @@ Utilities/
 Test utilities thoroughly since they're used throughout the app:
 
 ```swift
-class DateExtensionsTests: XCTestCase {
-    func testIsToday() {
-        let today = Date()
-        XCTAssertTrue(today.isToday)
+final class BakersMathTests: XCTestCase {
+    func testHydrationRoundsCorrectly() {
+        let hydration = BakersMath.hydration(water: 780, flour: 1000)
+        #expect(hydration == 78)
+    }
 
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
-        XCTAssertFalse(yesterday.isToday)
+    func testScaledWeightHonorsPrecision() {
+        let scaled = BakersMath.scaledWeight(original: 123.456, factor: 2, precision: .tenthGram)
+        #expect(scaled == 246.9)
     }
 }
 ```
 
 ## Common Utilities to Include
 
-- **Validation**: Email, phone, password strength
-- **Formatting**: Dates, numbers, currency, percentages
-- **Colors**: Theme colors, semantic colors
-- **Typography**: Font styles, sizes
-- **Animations**: Common transitions and effects
-- **Device**: Screen size helpers, platform detection
-- **Debugging**: Logging utilities, development helpers
+- **Baker's Math Helpers**: Hydration, salt percentage, prefermented flour calculations
+- **Formatting**: Gram rounding, percentage strings, preferment schedule copy
+- **Parsing Helpers**: Unit conversions (cups → grams), regex helpers for ingredient lines
+- **View Modifiers**: Hydration badges, validation banners, scaling prompts
+- **Batch Planning**: Timeline utilities for preferment start/end, production calendar dates
+- **Testing Fixtures**: Factories for sample formulas/ingredients used across tests

@@ -8,6 +8,8 @@ You have access to Context7 MCP server for fetching up-to-date documentation. **
 3. Check for deprecations and new iOS capabilities
 4. Find best practices and code examples from official Apple documentation
 
+If Context7 is unavailable after two attempts (network outage, permission issue, etc.), fall back to the latest local Apple docs, WWDC notes, or well-vetted internal references. Capture the fallback source and the outage reason inside `<development_analysis>` so future readers know why Context7 was skipped.
+
 Before implementing any iOS/SwiftUI feature, use Context7 to fetch relevant documentation:
 - For SwiftUI views and modifiers: `get-library-docs` with library ID `/apple/swiftui`
 - For UIKit integration: `get-library-docs` with library ID `/apple/uikit`
@@ -230,53 +232,53 @@ struct ContentView: View {
 
 **Key Patterns:**
 ```swift
-@MainActor
-class UserService: ObservableObject {
-    @Published private(set) var currentUser: User?
-    @Published private(set) var isLoading = false
-    @Published private(set) var error: Error?
+struct FormulaValidationService {
+    let thresholds: ValidationThresholds
 
-    private let networkClient: NetworkClient
-    private let storage: UserStorage
+    func analyze(_ formula: Formula) -> FormulaAnalysis {
+        let hydration = formula.overallHydration
+        var warnings: [ValidationWarning] = []
 
-    init(networkClient: NetworkClient = .shared,
-         storage: UserStorage = .shared) {
-        self.networkClient = networkClient
-        self.storage = storage
-    }
-
-    func login(email: String, password: String) async {
-        isLoading = true
-        error = nil
-
-        do {
-            let user = try await networkClient.login(email: email, password: password)
-            currentUser = user
-            try await storage.save(user)
-        } catch {
-            self.error = error
+        if hydration > thresholds.maxHydration {
+            warnings.append(.init(level: .warning, category: "Hydration", message: "Hydration is very high", value: hydration))
         }
 
-        isLoading = false
+        if formula.saltPercentage < thresholds.minSaltPercentage {
+            warnings.append(.init(level: .info, category: "Salt", message: "Salt is on the low side", value: formula.saltPercentage))
+        }
+
+        return FormulaAnalysis(
+            totalFlour: formula.totalFlour,
+            totalWater: formula.totalWater,
+            totalWeight: formula.totalWeight,
+            hydration: hydration,
+            saltPercentage: formula.saltPercentage,
+            prefermentedFlourPercentage: formula.prefermentedFlourPercentage,
+            warnings: warnings
+        )
     }
+}
+
+struct ValidationThresholds {
+    let maxHydration: Double
+    let minSaltPercentage: Double
 }
 ```
 
 **Guidelines:**
 - Use protocol-oriented design for testability
 - Implement proper error handling
-- Use async/await for asynchronous operations
-- Keep services focused on a single domain
-- Use dependency injection
-- Make services @MainActor when they update UI state
-- Separate concerns (network, storage, business logic)
-- Cache data appropriately
+- Use async/await when touching the network/disk
+- Keep services focused on a single concern (parsing, calculation, scaling, persistence)
+- Inject collaborators so services are easy to mock and swap
+- Return value types/DTOs; never store SwiftUI state inside services
+- Cache expensive computations thoughtfully
 
 **Service Types:**
-- **Network Services:** API communication and data fetching
-- **Storage Services:** Data persistence (UserDefaults, Keychain, CoreData)
-- **Business Logic Services:** Complex calculations and business rules
-- **Integration Services:** Third-party SDK integrations
+- **Parsing Services:** Normalize raw recipe inputs into structured data
+- **Calculation Services:** Produce baker's percentages, validation warnings, and summary metrics
+- **Scaling Services:** Adjust formulas based on yield, preferment weight, or production constraints
+- **Persistence/Sync Services:** Load and save formulas/recipes locally or remotely
 
 ### Utilities Directory
 
@@ -284,30 +286,25 @@ class UserService: ObservableObject {
 
 **Common Utilities:**
 ```swift
-// Date+Extensions.swift
-extension Date {
-    var isToday: Bool {
-        Calendar.current.isDateInToday(self)
+// Double+BakersMath.swift
+extension Double {
+    var bakersPercentageString: String { String(format: "%.1f%%", self) }
+    func rounded(to precision: RoundingPrecision) -> Double {
+        let factor = pow(10, Double(precision.decimalPlaces))
+        return (self * factor).rounded() / factor
     }
 }
 
-// ViewModifiers.swift
-struct CardStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(radius: 4)
-    }
+// ValidationBannerModifier.swift
+struct ValidationBannerModifier: ViewModifier {
+    let warnings: [ValidationWarning]
+    // ...shared warning banner styling...
 }
 
-// Constants.swift
-enum Constants {
-    enum API {
-        static let baseURL = "https://api.example.com/v1"
-        static let timeout: TimeInterval = 30
-    }
+// BakersMathConstants.swift
+enum BakersMathConstants {
+    static let hydrationWarningRange: ClosedRange<Double> = 85...110
+    static let typicalSaltPercentage: ClosedRange<Double> = 1.6...2.4
 }
 ```
 
@@ -320,12 +317,12 @@ enum Constants {
 - Make utilities generic when appropriate
 
 **Common Categories:**
-- **Extensions:** Type extensions for Swift/SwiftUI types
-- **View Modifiers:** Reusable styling and behavior modifiers
-- **Validators:** Email, phone, password validation
-- **Formatters:** Date, number, currency formatting
-- **Constants:** App-wide configuration values
-- **Helpers:** Pure utility functions
+- **Extensions:** Shared baker's math helpers (`Double+BakersMath`, `Array+FlourType`)
+- **View Modifiers:** Hydration badges, validation banners, overlay helpers
+- **Validators:** Ingredient line parsing, preferment rule checks
+- **Formatters:** Gram/percentage formatting, production schedule strings
+- **Constants:** Hydration thresholds, default salt ranges, rounding preferences
+- **Helpers:** Pure baker's math functions, unit conversion utilities
 
 ### Scaling the Structure
 
@@ -333,44 +330,55 @@ As your app grows, organize within the base directories by feature:
 
 ```
 Views/
-├── Shared/
-│   ├── Buttons/
-│   ├── Cards/
-│   └── Forms/
-├── Authentication/
-│   ├── LoginView.swift
-│   └── SignUpView.swift
-├── Dashboard/
-│   ├── DashboardView.swift
+├── Shell/
+│   ├── ContentView.swift
+│   └── FormulaSplitView.swift
+├── Formula/
+│   ├── FormulaEditView.swift
+│   ├── CalculationsView.swift
 │   └── Components/
-└── Settings/
-    └── SettingsView.swift
+│       ├── HydrationSummary.swift
+│       ├── PrefermentList.swift
+│       └── ScalingControls.swift
+└── Shared/
+    ├── Buttons/
+    ├── Cards/
+    └── Indicators/
 
 Models/
-├── Authentication/
-│   └── User.swift
-├── Content/
-│   ├── Post.swift
-│   └── Comment.swift
-└── Settings.swift
+├── Recipe/
+│   ├── Recipe.swift
+│   ├── RawIngredient.swift
+│   └── RecipeSource.swift
+├── Formula/
+│   ├── Formula.swift
+│   ├── Preferment.swift
+│   ├── Soaker.swift
+│   └── FinalMix.swift
+└── Shared/
+    ├── BakersPercentages.swift
+    └── Validation.swift
 
 Services/
-├── Network/
-│   ├── APIClient.swift
-│   └── Endpoints.swift
-├── Authentication/
-│   └── AuthenticationService.swift
-└── Storage/
-    └── CoreDataService.swift
+├── Parsing/
+│   ├── RecipeParser.swift
+│   └── FormulaBuilder.swift
+├── Calculation/
+│   ├── FormulaCalculationService.swift
+│   └── FormulaValidationService.swift
+├── Scaling/
+│   └── FormulaScalingService.swift
+└── Persistence/
+    └── FormulaStore.swift (planned)
 ```
 
 ### File Naming Conventions
 
-- **Views:** Use descriptive names ending with `View` (e.g., `LoginView.swift`)
-- **Models:** Use singular nouns (e.g., `User.swift`, `Post.swift`)
-- **Services:** Use descriptive names ending with `Service` (e.g., `AuthService.swift`)
-- **Extensions:** Name by type being extended (e.g., `Date+Extensions.swift`)
-- **Test Files:** Mirror source file names with `Tests` suffix (e.g., `UserServiceTests.swift`)
+- **Views:** Use descriptive names ending with `View` (e.g., `FormulaEditView.swift`)
+- **Models:** Use singular nouns (e.g., `Formula.swift`, `Preferment.swift`)
+- **Services:** Use descriptive names ending with `Service` (e.g., `FormulaScalingService.swift`)
+- **Extensions:** Name by type being extended (e.g., `Double+BakersMath.swift`)
+- **Test Files:** Mirror source file names with `Tests` suffix (e.g., `FormulaValidationServiceTests.swift`)
 
 ## Implementation Standards
 

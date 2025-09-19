@@ -4,7 +4,7 @@ import Observation
 /// Professional formula structure - organized and calculated
 @Observable
 final class Formula: Identifiable, Hashable {
-    let id = UUID()
+    var id: UUID = UUID()
 
     /// Link to source recipe if exists
     var recipeId: UUID?
@@ -79,7 +79,8 @@ final class Formula: Identifiable, Hashable {
 
     init() {}
 
-    init(name: String) {
+    init(name: String, id: UUID = UUID()) {
+        self.id = id
         self.name = name
     }
 }
@@ -145,9 +146,9 @@ extension Formula: Codable {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Note: id is let constant, auto-generated as UUID()
-        // We don't decode it, each instance gets a fresh ID
-
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
         recipeId = try container.decodeIfPresent(UUID.self, forKey: .recipeId)
         name = try container.decode(String.self, forKey: .name)
         version = try container.decode(Int.self, forKey: .version)

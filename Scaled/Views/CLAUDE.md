@@ -23,18 +23,26 @@ Views are responsible for:
 
 ### State Management
 
-Use SwiftUI's built-in property wrappers:
+Lean on SwiftUI's native property wrappers. Most Scaled views observe `@Observable` models through `@Bindable`:
 
 ```swift
-struct ContentView: View {
-    @State private var isShowing = false     // Local view state
-    @Binding var userName: String            // Two-way binding from parent
-    @Environment(\.dismiss) var dismiss      // Environment values
-
-    let user: User  // Observable model (if User is @Observable)
+struct FormulaSidebar: View {
+    @Bindable var library: FormulaLibrary
 
     var body: some View {
-        // View implementation
+        List(selection: $library.selection) {
+            ForEach(library.formulas) { formula in
+                NavigationLink(value: formula.id) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(formula.name.isEmpty ? "Untitled" : formula.name)
+                            .font(.headline)
+                        Text("Hydration \(Int(formula.overallHydration))% · \(Int(formula.totalWeight))g")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }
 }
 ```
@@ -44,12 +52,16 @@ struct ContentView: View {
 Build complex UIs from smaller, reusable components:
 
 ```swift
-struct DashboardView: View {
+struct FormulaDetailView: View {
+    @Bindable var formula: Formula
+
     var body: some View {
-        VStack {
-            HeaderView()
-            StatsSection()
-            ActivityList()
+        TabView {
+            FormulaEditView(formula: formula)
+                .tabItem { Label("Edit", systemImage: "pencil") }
+
+            CalculationsView(formula: formula)
+                .tabItem { Label("Math", systemImage: "function") }
         }
     }
 }
@@ -58,19 +70,19 @@ struct DashboardView: View {
 ## Guidelines
 
 ### DO:
-- Keep views focused and small (under 150 lines ideally)
-- Extract reusable components
-- Use view modifiers for common styling
-- Leverage SwiftUI's built-in components
-- Use previews for rapid development
-- Handle loading and error states
+- Keep screens focused and small (under ~150 lines) and extract complex sections
+- Observe `@Observable` models via `@Bindable` to keep hydration/salt metrics live
+- Drive UI directly from services/models — format results inside helper views/modifiers
+- Use custom modifiers for baker's math presentation (hydration badges, warning banners)
+- Leverage previews to show baseline, high-hydration, and enriched dough states
+- Audit accessibility (Dynamic Type, VoiceOver descriptions for warnings)
 
 ### DON'T:
-- Put business logic in views (use Services)
-- Make network calls directly from views
-- Create deeply nested view hierarchies
-- Ignore accessibility
-- Use UIKit unless absolutely necessary
+- Put business logic or baker's math calculations in views — rely on services
+- Make network or storage calls directly from views
+- Create deeply nested view hierarchies (extract reusable components instead)
+- Ignore accessibility/state restoration for warnings and critical metrics
+- Reach for UIKit unless SwiftUI cannot achieve the interaction
 
 ## Organization
 
@@ -78,18 +90,20 @@ As your app grows, organize by feature:
 
 ```
 Views/
-├── Shared/
-│   ├── Buttons/
-│   ├── Cards/
-│   └── Forms/
-├── Authentication/
-│   ├── LoginView.swift
-│   └── SignUpView.swift
-├── Dashboard/
-│   ├── DashboardView.swift
+├── Shell/
+│   ├── ContentView.swift            # NavigationSplitView + App shell
+│   └── FormulaSplitView.swift       # Sidebar + detail orchestration
+├── Formula/
+│   ├── FormulaEditView.swift        # Ingredient editing
+│   ├── CalculationsView.swift       # Baker's math + validation output
 │   └── Components/
-└── Settings/
-    └── SettingsView.swift
+│       ├── HydrationSummary.swift
+│       ├── PrefermentList.swift
+│       └── ScalingControls.swift
+└── Shared/
+    ├── Buttons/
+    ├── Cards/
+    └── Indicators/
 ```
 
 ## View Modifiers
@@ -97,20 +111,37 @@ Views/
 Create custom view modifiers for consistent styling:
 
 ```swift
-struct PrimaryButtonStyle: ViewModifier {
+struct HydrationBadgeModifier: ViewModifier {
+    let hydration: Double
+
     func body(content: Content) -> some View {
         content
-            .font(.headline)
-            .foregroundColor(.white)
-            .padding()
-            .background(Color.blue)
-            .cornerRadius(10)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(hydrationColor.opacity(0.15))
+            .foregroundStyle(hydrationColor)
+            .clipShape(Capsule())
+            .accessibilityLabel("Hydration \(Int(hydration)) percent")
+    }
+
+    private var hydrationColor: Color {
+        switch hydration {
+        case ..<55: return .orange
+        case ..<85: return .green
+        default: return .blue
+        }
+    }
+}
+
+extension View {
+    func hydrationBadge(_ hydration: Double) -> some View {
+        modifier(HydrationBadgeModifier(hydration: hydration))
     }
 }
 
 // Usage
-Button("Save") { }
-    .modifier(PrimaryButtonStyle())
+Text("75% hydration")
+    .hydrationBadge(75)
 ```
 
 ## Testing

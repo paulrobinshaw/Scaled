@@ -4,7 +4,7 @@ import Observation
 /// Soaker component - hydrated grains/seeds without fermentation
 @Observable
 final class Soaker: Identifiable {
-    let id = UUID()
+    var id: UUID = UUID()
     var name: String = ""
 
     /// Grains or seeds being soaked
@@ -39,7 +39,8 @@ final class Soaker: Identifiable {
 
     init() {}
 
-    init(name: String) {
+    init(name: String, id: UUID = UUID()) {
+        self.id = id
         self.name = name
     }
 
@@ -84,7 +85,9 @@ extension Soaker: Codable {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Note: id is auto-generated as UUID()
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
         name = try container.decode(String.self, forKey: .name)
         grains = try container.decode([GrainItem].self, forKey: .grains)
 

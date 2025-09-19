@@ -9,6 +9,8 @@ This document captures important learnings, concepts, and solutions that arose d
 - [Codable Protocol Purpose](#codable-protocol-purpose)
 - [Final Class and Required Initializers](#final-class-and-required-initializers)
 - [Swift Type-Checking Compiler Errors](#swift-type-checking-compiler-errors)
+- [Preserving Identity When Decoding Observable Models](#preserving-identity-when-decoding-observable-models)
+- [Keeping SwiftUI Views in Sync with @Bindable](#keeping-swiftui-views-in-sync-with-bindable)
 
 ---
 
@@ -1234,6 +1236,86 @@ var body: some View {
 
 ---
 
+## Preserving Identity When Decoding Observable Models
+
+### Question
+Why did persisted `Formula`/`Preferment`/`Soaker` instances lose their identity after loading from storage, and how do we retain it?
+
+### Answer
+
+`@Observable` classes originally declared `let id = UUID()` and their custom `init(from:)` skipped the encoded identifier. During decoding, Swift created a brand-new instance with a fresh UUID, so every relationship (`Recipe.formulaId`, list selection, scaling lookups) broke once data round-tripped through persistence.
+
+**Fix:** make `id` mutable and decode the stored UUID inside `init(from:)`, or pass it through a convenience initializer.
+
+```swift
+@Observable
+final class Formula: Identifiable, Codable {
+    var id: UUID = UUID()
+
+    convenience init(from decoder: Decoder) throws {
+        self.init()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
+        // decode the remaining properties…
+    }
+
+    init(name: String, id: UUID = UUID()) {
+        self.id = id
+        self.name = name
+    }
+}
+```
+
+### Why it Matters
+- **Relationship integrity:** selection in `NavigationSplitView` and foreign-key style links rely on stable identifiers.
+- **Business logic:** services such as `FormulaScalingService.scaleByAvailablePreferment` search by `UUID` and silently fail if IDs change.
+- **Persistence correctness:** encoding/decoding should be lossless unless you intentionally re-key objects.
+
+### Additional Tips
+- Apply the same pattern to every observable model that encodes an `id`.
+- When composing convenience initialisers, accept `id` as a parameter so call sites can inject known identifiers (useful in migrations/tests).
+
+---
+
+## Keeping SwiftUI Views in Sync with @Bindable
+
+### Question
+`CalculationsView` stopped updating hydration, salt %, and validation warnings while editing a formula. How do we keep the view reactive?
+
+### Answer
+
+The view accepted the model as a plain `let formula: Formula` and cached derived values in `@State`. Because there was no observation relationship, SwiftUI never re-rendered when nested properties changed.
+
+**Solution:** receive the model as `@Bindable` (or `@ObservedObject` on earlier OSes) and compute derived values on demand.
+
+```swift
+struct CalculationsView: View {
+    @Bindable var formula: Formula
+    private let calculationService = FormulaCalculationService()
+
+    private var bakersPercentages: BakersPercentageTable {
+        calculationService.calculateBakersPercentages(for: formula)
+    }
+
+    var body: some View {
+        ScrollView { /* render using live data */ }
+    }
+}
+```
+
+### Benefits
+- **Live updates:** edits in `FormulaEditView` propagate instantly to calculations and validations.
+- **Less state juggling:** no more `onAppear`/`onChange` bookkeeping or stale cached arrays.
+- **Simpler testing:** derived data is pure, making previews and unit tests more predictable.
+
+### When to Use
+- Prefer `@Bindable` whenever you hand an `@Observable` model down the view hierarchy on iOS 17+/macOS 14+.
+- Fall back to `@ObservedObject` + `ObservableObject` for earlier OS targets.
+
+---
+
 ## Key Takeaways
 
 1. **Use `@Observable` with classes** for SwiftUI reactive data
@@ -1241,7 +1323,9 @@ var body: some View {
 3. **Implement Codable** for persistence and data transfer
 4. **Use `final`** on @Observable classes to avoid required initializers
 5. **Manually implement Codable** for @Observable classes to handle hidden properties
-6. **Extract complex SwiftUI views** to avoid type-checking timeouts
+6. **Restore encoded identifiers** when decoding observable models to keep relationships intact
+7. **Leverage `@Bindable`/`@ObservedObject`** so downstream views stay in sync with observable models
+8. **Extract complex SwiftUI views** to avoid type-checking timeouts
 
 ---
 

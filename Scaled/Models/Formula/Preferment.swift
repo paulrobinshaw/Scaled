@@ -4,7 +4,7 @@ import Observation
 /// Preferment component of a formula
 @Observable
 final class Preferment: Identifiable {
-    let id = UUID()
+    var id: UUID = UUID()
     var name: String = ""
     var type: PrefermentType = .levain
 
@@ -45,7 +45,8 @@ final class Preferment: Identifiable {
 
     init() {}
 
-    init(name: String, type: PrefermentType) {
+    init(name: String, type: PrefermentType, id: UUID = UUID()) {
+        self.id = id
         self.name = name
         self.type = type
     }
@@ -112,7 +113,9 @@ extension Preferment: Codable {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Note: id is auto-generated as UUID()
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
         name = try container.decode(String.self, forKey: .name)
         type = try container.decode(PrefermentType.self, forKey: .type)
 

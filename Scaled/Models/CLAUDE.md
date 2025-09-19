@@ -24,28 +24,42 @@ Use the `@Observable` macro (Swift 5.9+) for models that need UI observation:
 import Observation
 
 @Observable
-class User {
+final class Formula {
     var id: UUID = UUID()
     var name: String = ""
-    var email: String = ""
-    var isActive: Bool = true
+    var preferments: [Preferment] = []
+    var soakers: [Soaker] = []
+    var finalMix = FinalMix()
+
+    var overallHydration: Double {
+        guard totalFlour > 0 else { return 0 }
+        return (totalWater / totalFlour) * 100
+    }
+
+    var totalFlour: Double {
+        finalMix.flours.totalWeight + preferments.reduce(0) { $0 + $1.flourWeight }
+    }
+
+    var totalWater: Double {
+        finalMix.water + preferments.reduce(0) { $0 + $1.waterWeight } + soakers.reduce(0) { $0 + $1.water }
+    }
 }
 ```
 
 ## Guidelines
 
 ### DO:
-- Use value types (struct) for simple data without identity
-- Use reference types (class) with @Observable for shared state
-- Keep models focused on a single responsibility
-- Use Swift's Codable for JSON serialization
-- Define computed properties for derived values
+- Use value types (struct) for immutable ingredients and components (`FlourItem`, `GrainItem`)
+- Use `@Observable` reference types when multiple views mutate the same formula/recipe object
+- Keep models focused on data + derived baker's math (computed properties for hydration, salt %, prefermented flour)
+- Conform to `Codable` (and restore identifiers during decoding)
+- Document invariants (e.g., prefermented flour contributes to total flour, soaker grains do not)
 
 ### DON'T:
-- Put business logic in models (use Services)
-- Make network calls from models
-- Include view-specific formatting (use Views or Extensions)
-- Create massive "God objects" with too many responsibilities
+- Embed service logic (parsing, validation, scaling) inside models
+- Make network or persistence calls from models
+- Include view-specific formatting (e.g., `String(format:)` for hydration labels)
+- Let one model balloon with unrelated concerns—split into Recipe, Formula, Preferment, etc.
 
 ## Example Structure
 
@@ -53,17 +67,18 @@ As your app grows, organize models by feature:
 
 ```
 Models/
-├── User.swift
-├── Authentication/
-│   ├── LoginCredentials.swift
-│   └── AuthToken.swift
-├── Content/
-│   ├── Post.swift
-│   ├── Comment.swift
-│   └── Media.swift
-└── Settings/
-    ├── UserPreferences.swift
-    └── AppConfiguration.swift
+├── Recipe/
+│   ├── Recipe.swift              # Raw user input
+│   ├── RawIngredient.swift       # Unparsed ingredient lines
+│   └── RecipeSource.swift
+├── Formula/
+│   ├── Formula.swift
+│   ├── Preferment.swift
+│   ├── Soaker.swift
+│   └── FinalMix.swift
+└── Shared/
+    ├── BakersPercentages.swift   # DTOs for calculations
+    └── Validation.swift          # ValidationWarning, FormulaAnalysis
 ```
 
 ## Testing
@@ -71,5 +86,5 @@ Models/
 Every model should have corresponding unit tests that verify:
 - Initialization with default values
 - Codable encoding/decoding
-- Computed properties
-- Any validation logic
+- Computed properties (hydration, salt, prefermented flour)
+- Validation helpers / invariants (e.g., prefermented flour never exceeds total flour)

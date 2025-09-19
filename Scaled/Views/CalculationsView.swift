@@ -1,9 +1,7 @@
 import SwiftUI
 
 struct CalculationsView: View {
-    let formula: Formula
-    @State private var bakersPercentages: BakersPercentageTable?
-    @State private var validationWarnings: [ValidationWarning] = []
+    @Bindable var formula: Formula
 
     private let calculationService = FormulaCalculationService()
     private let validationService = FormulaValidationService()
@@ -31,14 +29,6 @@ struct CalculationsView: View {
         }
         .navigationTitle(formula.name.isEmpty ? "Calculations" : formula.name)
         .navigationBarTitleDisplayMode(.large)
-        .onAppear {
-            calculateBakersPercentages()
-            validateFormula()
-        }
-        .onChange(of: formula.totalFlour) { _, _ in
-            calculateBakersPercentages()
-            validateFormula()
-        }
     }
 
     // MARK: - Summary Card
@@ -133,25 +123,22 @@ struct CalculationsView: View {
             Text("Baker's Percentages")
                 .font(.headline)
 
-            if let percentages = bakersPercentages {
-                // Total Formula
-                if !percentages.totalFormula.isEmpty {
-                    Text("Total Formula")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            if !bakersPercentages.totalFormula.isEmpty {
+                Text("Total Formula")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
 
-                    ForEach(percentages.totalFormula) { row in
-                        HStack {
-                            Text(row.ingredient)
-                                .font(.system(.body, design: .monospaced))
-                            Spacer()
-                            Text("\(Int(row.weight))g")
-                                .foregroundColor(.secondary)
-                                .font(.system(.caption, design: .monospaced))
-                            Text(String(format: "%.1f%%", row.percentage))
-                                .frame(width: 60, alignment: .trailing)
-                                .font(.system(.body, design: .monospaced))
-                        }
+                ForEach(bakersPercentages.totalFormula) { row in
+                    HStack {
+                        Text(row.ingredient)
+                            .font(.system(.body, design: .monospaced))
+                        Spacer()
+                        Text("\(Int(row.weight))g")
+                            .foregroundColor(.secondary)
+                            .font(.system(.caption, design: .monospaced))
+                        Text(String(format: "%.1f%%", row.percentage))
+                            .frame(width: 60, alignment: .trailing)
+                            .font(.system(.body, design: .monospaced))
                     }
                 }
             }
@@ -198,12 +185,12 @@ struct CalculationsView: View {
     }
 
     // MARK: - Helper Methods
-    private func calculateBakersPercentages() {
-        bakersPercentages = calculationService.calculateBakersPercentages(for: formula)
+    private var bakersPercentages: BakersPercentageTable {
+        calculationService.calculateBakersPercentages(for: formula)
     }
 
-    private func validateFormula() {
-        validationWarnings = validationService.validate(formula: formula)
+    private var validationWarnings: [ValidationWarning] {
+        validationService.validate(formula: formula)
     }
 
     private var hydrationColor: Color {

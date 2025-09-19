@@ -4,7 +4,7 @@ import Observation
 /// Final mix components after preferments and soakers
 @Observable
 final class FinalMix: Identifiable {
-    let id = UUID()
+    var id: UUID = UUID()
 
     /// Flour components
     var flours = FlourComponent()
@@ -189,9 +189,9 @@ extension FinalMix: Codable {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Note: id is let constant, so we can't decode it
-        // It will be auto-generated as UUID()
-
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
         flours = try container.decode(FlourComponent.self, forKey: .flours)
         water = try container.decode(Double.self, forKey: .water)
         salt = try container.decode(Double.self, forKey: .salt)

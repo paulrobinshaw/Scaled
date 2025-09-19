@@ -4,7 +4,7 @@ import Observation
 /// Raw recipe as entered by user - unstructured and messy
 @Observable
 final class Recipe: Identifiable {
-    let id = UUID()
+    var id: UUID = UUID()
     var name: String = ""
     var source: RecipeSource?
     var notes: String = ""
@@ -19,7 +19,8 @@ final class Recipe: Identifiable {
 
     init() {}
 
-    init(name: String) {
+    init(name: String, id: UUID = UUID()) {
+        self.id = id
         self.name = name
     }
 }
@@ -49,7 +50,9 @@ extension Recipe: Codable {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Note: id is auto-generated as UUID()
+        if let decodedId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+            id = decodedId
+        }
         name = try container.decode(String.self, forKey: .name)
         source = try container.decodeIfPresent(RecipeSource.self, forKey: .source)
         notes = try container.decode(String.self, forKey: .notes)

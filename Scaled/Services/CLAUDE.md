@@ -23,38 +23,44 @@ Services handle:
 
 ## Architecture Pattern
 
-Services act as the bridge between Views and external systems:
+Services transform data and apply baker's math while keeping view/UI state elsewhere:
 
 ```swift
-@MainActor
-class UserService: ObservableObject {
-    @Published private(set) var currentUser: User?
-    @Published private(set) var isLoading = false
-    @Published private(set) var error: Error?
+struct FormulaValidationService {
+    let thresholds: ValidationThresholds
 
-    private let networkClient: NetworkClient
-    private let storage: UserStorage
+    func analyze(_ formula: Formula) -> FormulaAnalysis {
+        var warnings: [ValidationWarning] = []
 
-    init(networkClient: NetworkClient = .shared,
-         storage: UserStorage = .shared) {
-        self.networkClient = networkClient
-        self.storage = storage
-    }
-
-    func login(email: String, password: String) async {
-        isLoading = true
-        error = nil
-
-        do {
-            let user = try await networkClient.login(email: email, password: password)
-            currentUser = user
-            try await storage.save(user)
-        } catch {
-            self.error = error
+        if formula.overallHydration > thresholds.maxHydration {
+            warnings.append(.init(level: .warning,
+                                  category: "Hydration",
+                                  message: "Hydration is very high",
+                                  value: formula.overallHydration))
         }
 
-        isLoading = false
+        if formula.saltPercentage < thresholds.minSaltPercentage {
+            warnings.append(.init(level: .info,
+                                  category: "Salt",
+                                  message: "Salt is lower than typical artisan ranges",
+                                  value: formula.saltPercentage))
+        }
+
+        return FormulaAnalysis(
+            totalFlour: formula.totalFlour,
+            totalWater: formula.totalWater,
+            totalWeight: formula.totalWeight,
+            hydration: formula.overallHydration,
+            saltPercentage: formula.saltPercentage,
+            prefermentedFlourPercentage: formula.prefermentedFlourPercentage,
+            warnings: warnings
+        )
     }
+}
+
+struct ValidationThresholds {
+    let maxHydration: Double
+    let minSaltPercentage: Double
 }
 ```
 
@@ -63,46 +69,53 @@ class UserService: ObservableObject {
 ### DO:
 - Use protocol-oriented design for testability
 - Implement proper error handling
-- Use async/await for asynchronous operations
-- Keep services focused on a single domain
-- Use dependency injection
-- Make services @MainActor when they update UI state
-- Cache data appropriately
+- Use async/await for asynchronous operations when touching the network or disk
+- Keep services focused on a single domain (parsing, calculation, scaling, persistence)
+- Inject collaborators so domain logic is easy to mock
+- Return value types or lightweight DTOs that views/models can consume
+- Cache expensive calculations or I/O results where it improves UX
 
 ### DON'T:
 - Create "Manager" classes that do everything
-- Mix concerns (separate network, storage, business logic)
-- Ignore thread safety
-- Return raw network responses (transform to models)
+- Mix concerns (separate parsing, calculation, scaling, and persistence layers)
+- Ignore thread safety for shared resources
+- Return raw network responses (normalize into project models)
+- Mark services as `ObservableObject` or store UI state inside services
 - Create circular dependencies
 
 ## Service Types
 
-Common service patterns:
+Common Scaled service categories:
 
-### Network Service
+### Parsing Service
 ```swift
-protocol NetworkService {
-    func fetch<T: Decodable>(_ type: T.Type, from endpoint: Endpoint) async throws -> T
-    func send<T: Encodable>(_ data: T, to endpoint: Endpoint) async throws
+protocol RecipeParsing {
+    func normalize(raw: [RawIngredient]) -> ParsedRecipe
 }
 ```
 
-### Storage Service
+### Calculation Service
 ```swift
-protocol StorageService {
-    func save<T: Codable>(_ object: T, for key: String) async throws
-    func load<T: Codable>(_ type: T.Type, for key: String) async throws -> T?
-    func delete(for key: String) async throws
+protocol FormulaCalculating {
+    func bakersPercentages(for formula: Formula) -> BakersPercentageTable
+    func hydration(for formula: Formula) -> Double
 }
 ```
 
-### Business Logic Service
+### Scaling Service
 ```swift
-class PricingService {
-    func calculateDiscount(for items: [Item], with coupon: Coupon?) -> Decimal {
-        // Business rules here
-    }
+protocol FormulaScaling {
+    func scale(formula: Formula, toTargetWeight grams: Double) -> Formula
+    func scale(formula: Formula, usingPreferment id: UUID, availableWeight grams: Double) -> Formula
+}
+```
+
+### Persistence / Sync Service
+```swift
+protocol FormulaStore {
+    func save(_ formula: Formula) throws
+    func load(id: UUID) throws -> Formula?
+    func delete(id: UUID) throws
 }
 ```
 
@@ -110,20 +123,16 @@ class PricingService {
 
 ```
 Services/
-├── Network/
-│   ├── APIClient.swift
-│   ├── Endpoints.swift
-│   └── URLSession+Extensions.swift
-├── Storage/
-│   ├── UserDefaults+Service.swift
-│   ├── KeychainService.swift
-│   └── CoreDataService.swift
-├── Authentication/
-│   ├── AuthenticationService.swift
-│   └── TokenManager.swift
-└── Business/
-    ├── PricingService.swift
-    └── ValidationService.swift
+├── Parsing/
+│   ├── RecipeParser.swift          # Convert RawIngredients into normalized data
+│   └── FormulaBuilder.swift        # Map parsed data into Formula structures
+├── Calculation/
+│   ├── FormulaCalculationService.swift
+│   └── FormulaValidationService.swift
+├── Scaling/
+│   └── FormulaScalingService.swift
+└── Persistence/
+    └── FormulaStore.swift          # Future: local/cloud persistence for formulas
 ```
 
 ## Testing
@@ -136,17 +145,23 @@ Services should be thoroughly tested:
 - Test async operations
 
 ```swift
-class UserServiceTests: XCTestCase {
-    var sut: UserService!
-    var mockNetwork: MockNetworkClient!
+final class FormulaValidationServiceTests: XCTestCase {
+    private var thresholds: ValidationThresholds!
+    private var service: FormulaValidationService!
 
     override func setUp() {
-        mockNetwork = MockNetworkClient()
-        sut = UserService(networkClient: mockNetwork)
+        thresholds = .init(maxHydration: 85, minSaltPercentage: 1.6)
+        service = FormulaValidationService(thresholds: thresholds)
     }
 
-    func testLoginSuccess() async {
-        // Test implementation
+    func testHydrationWarningWhenAboveThreshold() {
+        let formula = Formula(name: "Test")
+        formula.finalMix.water = 900
+        formula.finalMix.flours.addFlour(type: .bread, weight: 1000)
+
+        let analysis = service.analyze(formula)
+
+        #expect(analysis.warnings.contains { $0.category == "Hydration" })
     }
 }
 ```

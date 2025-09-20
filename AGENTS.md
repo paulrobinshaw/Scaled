@@ -294,3 +294,28 @@ Deliver utilities consumable by Views, Models, and Services without alteration, 
 - Keep this document roughly 300 lines—comprehensive yet approachable.
 - Production readiness (polished UX, comprehensive testing, knowledge sharing) is a non-negotiable deliverable.
 - When uncertain, favor clarity, modularity, and rigorous validation over clever shortcuts.
+
+## Refactor Summary (2025-09-18)
+- Replaced legacy `Models/`, `Services/`, and `Views/` monoliths with `Features/Formula` feature module and shared `Foundation/` helpers.
+- Introduced pure baker's math functions (hydration, prefermented flour, scaling, mis-weigh correction) with dedicated unit tests.
+- Added protocol-driven persistence (`FormulaStoring`) and JSON import/export utilities to support future storage backends.
+- Implemented SwiftUI ingredient grid with inline editing, undo support, and collapsible sections styled via the new Design System tokens.
+- Added SwiftLint configuration enforcing ≤300 line files, 120-character line width, and naming hygiene.
+
+## Module Map
+- `App/`: `ScaledApp`, dependency environment, `RootScene` entry point.
+- `DesignSystem/`: Color, spacing, typography tokens, reusable view modifiers.
+- `Foundation/`
+  - `BakersMath/`: Totals, scaling, mis-weigh helpers, numeric extensions.
+  - `Formula/`: Domain models (`Formula`, `FinalMix`, `Preferment`, `Soaker`, identifiers).
+  - `Undo/`: Generic undo stack.
+  - `Dependency/`: `AppDependencies`, preview data seeding.
+- `Features/Formula/`
+  - `State/`: `FormulaListModel`, `FormulaEditorModel`.
+  - `Views/`: `FormulaDetailView`, `Root` tabs, calculations screens.
+  - `Components/`: Ingredient grid, summary cards, editor rows, final mix controls.
+  - `Services/`: Bakers percentage calculator, formula analyzer.
+- `Components/`: Shared UI like `CollapsibleSection`, numeric input fields, import/export sheet.
+- `Persistence/`: `FormulaStoring` protocol with `InMemoryFormulaStore` actor.
+- `Parsing/`: `FormulaJSONCoder` for import/export flows.
+- `ScaledTests/Formula/`: Baker's math, analyzer, import/export, and undo stack tests built on fixtures.

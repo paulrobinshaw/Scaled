@@ -1,0 +1,19 @@
+included:
+  - Scaled
+  - ScaledTests
+  - ScaledUITests
+opt_in_rules:
+  - line_length
+  - file_length
+  - redundant_type_annotation
+  - unused_declaration
+identifier_name:
+  min_length: 2
+line_length:
+  warning: 120
+  error: 140
+file_length:
+  warning: 280
+  error: 300
+trailing_whitespace:
+  ignores_empty_lines: true

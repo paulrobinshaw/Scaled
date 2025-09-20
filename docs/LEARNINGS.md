@@ -1330,3 +1330,23 @@ struct CalculationsView: View {
 ---
 
 *This document will be updated as new architectural questions arise during development.*
+
+---
+
+## SwiftUI Feature Modules & Baker's Math Helpers (2025-09-18)
+
+### What changed?
+We migrated Scaled away from monolithic services and global `@Observable` singletons to a feature-first layout:
+- `Foundation/BakersMath` now hosts pure helpers like `hydration(for:)`, `preFermentedFlour(in:)`, and scaling utilities that keep baker's percentages intact.
+- `Features/Formula` owns view state (`FormulaListModel`, `FormulaEditorModel`) and SwiftUI composition while depending on injected services.
+- Undo/redo is centralized through a reusable `UndoStack` value type so inline ingredient edits can safely roll back.
+
+### Why it matters
+- **Testability**: Pure functions make it trivial to cover hydration, scaling, and mis-weigh correction edge cases without spinning up UI.
+- **SwiftUI sanity**: Feature folders keep views lean (<300 lines) and ensure state flows through `@Bindable` models instead of ad-hoc view models.
+- **Extensibility**: Protocol-driven services (`FormulaStoring`, `BakersPercentageCalculating`, `FormulaAnalyzing`) let us swap persistence or analytics without touching views.
+
+### Tips for future work
+- When adding a new feature, create sibling folders (`Views/`, `State/`, `Services/`, `Tests/`) so the Xcode file watcher picks them up automatically.
+- Keep numerical helpers pure and surface errors via `ValidationWarning` so UI stays declarative.
+- If a view needs more than ~250 lines, promote subviews into `Features/<Feature>/Components/` before adding logic.

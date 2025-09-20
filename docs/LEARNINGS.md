@@ -1329,6 +1329,23 @@ struct CalculationsView: View {
 
 ---
 
+## Fast Manual Recipe Entry in SwiftUI
+
+### Question
+How can we design a delightful manual recipe entry flow that lets bakers capture recipes quickly in SwiftUI?
+
+### Answer
+
+- **Anchor on the 60-second promise.** Manual entry is the primary capture path, so every screen should keep the baker focused on getting from "rough recipe" to a trustworthy formula in under a minute. Offer a clear choice between starting from a template or jumping straight into manual entry, and surface the progress toward a complete formula so the flow feels fast and intentional.【F:docs/PRD.md†L22-L29】【F:docs/PRD.md†L73-L79】
+- **Structure inputs as bite-sized cards.** Use a vertically scrolling `List` (or `ScrollView` + `LazyVStack`) with sections for meta data, preferments, and final mix ingredients. Each row can be a lightweight view that accepts `@Bindable` models so edits propagate instantly. Show only the fields that matter for the ingredient type (e.g., flour rows expose weight + flour type picker, water rows expose temperature slider) to reduce decision fatigue.
+- **Create a purpose-built keypad.** Replace the default keyboard with a numeric pad that includes quick-add controls for grams, percentages, and hydration shortcuts. Attach it with `.toolbar` when the ingredient amount field is focused, provide large tap targets, and respect hardware keyboard input. Pair with `@FocusState` to jump the cursor to the next logical field after submission so the baker never touches the screen more than necessary.【F:docs/PRD.md†L244-L248】
+- **Offer rapid ingredient creation.** Provide a persistent "Add ingredient" button that inserts a pre-filled row using the most common flour or water choice, and support paste/import so bakers can drop text from spreadsheets or notes. Consider a multi-line capture sheet: a `TextEditor` with parsing preview that lets power users paste a whole recipe, review detected rows, and accept them into the structured list.
+- **Layer delightful validation.** As weights change, calculate baker's percentages live and flash subtle confirmation (e.g., a checkmark pulse) when numbers look professional. For suspicious ratios, slide in inline warnings that explain the math and how to fix it, reinforcing trust without blocking progress. Summarize hydration, salt %, and prefermented flour in a sticky header so bakers feel oriented.
+- **Speed up common adjustments.** Add swipe actions or trailing menus on ingredient rows for quick duplication, conversion between preferment/final mix, or toggling "counts as flour". Provide command menu shortcuts (`.commands`) and hardware keyboard navigation for pro bakers working on iPad or Magic Keyboard.
+- **Delight through continuity.** Keep animations gentle but informative: fade in new rows, slide totals into place, and use haptics (`.sensoryFeedback`) when a section is complete. Respect offline constraints and autosave drafts frequently so bakers feel safe closing the app mid-entry.
+
+---
+
 *This document will be updated as new architectural questions arise during development.*
 
 ---
